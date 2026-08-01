@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -12,7 +12,9 @@ import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 
 const mainListItems = [
   {
@@ -40,6 +42,11 @@ const mainListItems = [
     path: "/eventProposals",
     icon: <DescriptionRoundedIcon />,
   },
+  {
+    text: "Reportes",
+    path: "/reports",
+    icon: <AssessmentRoundedIcon />,
+  },
 ];
 
 const secondaryListItems = [
@@ -50,7 +57,19 @@ const secondaryListItems = [
   },
 ];
 
-export default function MenuContent() {
+const reportsListItems = [
+  {
+    text: "Visitas Grupales",
+    path: "/reports/groupVisits",
+    icon: <GroupsRoundedIcon />,
+  },
+];
+
+export default function MenuContent({ onNavigate }) {
+  const location = useLocation();
+  const isReportsMenu = location.pathname.startsWith("/reports");
+  const listItems = isReportsMenu ? reportsListItems : mainListItems;
+
   return (
     <Stack
       sx={{
@@ -60,9 +79,24 @@ export default function MenuContent() {
       }}
     >
       <List dense>
-        {mainListItems.map((item) => (
+        {isReportsMenu && (
+          <ListItem disablePadding sx={{ display: "block" }}>
+            <ListItemButton component={NavLink} to="/" onClick={onNavigate}>
+              <ListItemIcon>
+                <ArrowBackRoundedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Volver" />
+            </ListItemButton>
+          </ListItem>
+        )}
+
+        {listItems.map((item) => (
           <ListItem key={item.text} disablePadding sx={{ display: "block" }}>
-            <ListItemButton component={NavLink} to={item.path}>
+            <ListItemButton
+              component={NavLink}
+              to={item.path}
+              onClick={onNavigate}
+            >
               <ListItemIcon>{item.icon}</ListItemIcon>
 
               <ListItemText primary={item.text} />

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState } from "react";
 import esLocale from "@fullcalendar/core/locales/es";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -8,30 +8,37 @@ import interactionPlugin from "@fullcalendar/interaction";
 import CalendarToolbar from "./CalendarToolbar";
 import { getCalendarEvents } from "./calendarServiceMock";
 import ActivityPopover from "./ActivityPopover";
+import ActivityTodayGrid from "./ActivityTodayGrid";
 
 export default function MainCalendar() {
   const calendarRef = useRef(null);
-
   const [view, setView] = useState("dayGridMonth");
   const [title, setTitle] = useState("");
-  const [events, setEvents] = useState([]);
 
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [anchorPosition, setAnchorPosition] = useState(null);
 
-  useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const eventsData = await getCalendarEvents("2026-01-01", "2026-12-31");
+  const [allEvents, setAllEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-        setEvents(eventsData);
-      } catch (error) {
-        console.error(error);
-      }
-    };
+  const fetchEvents = useCallback(async (fetchInfo) => {
+    setLoading(true);
 
-    loadEvents();
+    try {
+      const data = await getCalendarEvents(
+        fetchInfo.startStr,
+        fetchInfo.endStr,
+      );
+
+      setAllEvents(data);
+      return data;
+    } catch (error) {
+      console.error("Error cargando actividades:", error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   return (
@@ -51,7 +58,10 @@ export default function MainCalendar() {
         locale="es"
         locales={[esLocale]}
         headerToolbar={false}
-        events={events}
+        slotMinTime={"09:00:00"}
+        slotMaxTime={"21:00:00"}
+        scrollTime={"09:00:00"}
+        events={fetchEvents}
         eventClick={(info) => {
           setSelectedActivity(info.event.extendedProps.actividad);
 
@@ -59,36 +69,50 @@ export default function MainCalendar() {
 
           setAnchorPosition({
             top: info.jsEvent.clientY,
+
             left: info.jsEvent.clientX,
           });
         }}
         height="auto"
         views={{
           dayGridMonth: {
-            titleFormat: { year: "numeric", month: "long" },
-          },
-          timeGridWeek: {
-            titleFormat: { year: "numeric", month: "long" },
-          },
-          timeGridDay: {
             titleFormat: {
               year: "numeric",
               month: "long",
+            },
+          },
+
+          timeGridWeek: {
+            titleFormat: {
+              year: "numeric",
+              month: "long",
+            },
+          },
+
+          timeGridDay: {
+            titleFormat: {
+              year: "numeric",
+
+              month: "long",
+
               day: "numeric",
             },
           },
         }}
         datesSet={(info) => {
           const raw = info.view.title;
-          setTitle(raw.charAt(0).toUpperCase() + raw.slice(1));
+
+          const nextTitle = raw.charAt(0).toUpperCase() + raw.slice(1);
+
+          setTitle((currentTitle) =>
+            currentTitle === nextTitle ? currentTitle : nextTitle,
+          );
         }}
         dayHeaderContent={(arg) => {
-          // 👉 MES: usar el texto original de FullCalendar
           if (arg.view.type === "dayGridMonth") {
             return arg.text.toUpperCase();
           }
 
-          // 👉 SEMANA / DÍA: custom
           const weekday = arg.date
             .toLocaleDateString("es-ES", {
               weekday: "short",
@@ -100,6 +124,7 @@ export default function MainCalendar() {
           return `${weekday} ${day}`;
         }}
       />
+
       <ActivityPopover
         open={Boolean(anchorPosition)}
         position={anchorPosition}
@@ -107,10 +132,14 @@ export default function MainCalendar() {
         slot={selectedSlot}
         onClose={() => {
           setAnchorPosition(null);
+
           setSelectedActivity(null);
+
           setSelectedSlot(null);
         }}
       />
+
+      <ActivityTodayGrid rows={allEvents} loading={loading} />
     </>
   );
 }

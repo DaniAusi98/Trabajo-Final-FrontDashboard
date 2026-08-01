@@ -12,6 +12,14 @@ import MenuButton from "./MenuButton";
 import MenuContent from "./MenuContent";
 
 export default function SideMenuMobile({ open, toggleDrawer }) {
+  const handleNavigate = (event) => {
+    const path = event.currentTarget.getAttribute("href");
+
+    if (!path?.startsWith("/reports")) {
+      toggleDrawer(false)();
+    }
+  };
+
   return (
     <Drawer anchor="left" open={open} onClose={toggleDrawer(false)}>
       <Stack
@@ -53,7 +61,7 @@ export default function SideMenuMobile({ open, toggleDrawer }) {
         <Divider />
 
         <Stack sx={{ flexGrow: 1 }}>
-          <MenuContent />
+          <MenuContent onNavigate={handleNavigate} />
         </Stack>
 
         <Divider />

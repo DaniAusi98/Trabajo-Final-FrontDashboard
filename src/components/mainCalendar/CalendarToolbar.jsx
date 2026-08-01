@@ -65,7 +65,7 @@ export default function CalendarToolbar({ calendarRef, view, setView, title }) {
             Hoy
           </Button>
 
-          <Stack direction="row" spacing={0} alignItems="center">
+          <Stack direction="row" spacing={0} sx={{ alignItems: "center" }}>
             <IconButton size="small" onClick={handlePrev}>
               <ChevronLeftIcon />
             </IconButton>

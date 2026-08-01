@@ -30,9 +30,9 @@ export default function ActivityPopover({
 
         <Typography fontWeight="bold">Horario</Typography>
 
-        <Typography>{slot?.inicio}</Typography>
+        <Typography>Inicio: {slot?.inicio}</Typography>
 
-        <Typography>{slot?.fin}</Typography>
+        <Typography>Fin: {slot?.fin}</Typography>
 
         <Divider sx={{ my: 1 }} />
 
@@ -40,7 +40,7 @@ export default function ActivityPopover({
 
         {activity?.salas?.length > 0 ? (
           activity.salas.map((sala) => (
-            <Typography key={sala.id}>• {sala.nombre}</Typography>
+            <Typography key={sala.salaId}>• {sala.nombreSala}</Typography>
           ))
         ) : (
           <Typography color="text.secondary">Sin salas asignadas</Typography>
@@ -52,7 +52,10 @@ export default function ActivityPopover({
 
         {activity?.recursos?.length > 0 ? (
           activity.recursos.map((recurso) => (
-            <Typography key={recurso.id}>• {recurso.nombre}</Typography>
+            <Typography key={recurso.recursoId}>
+              • {recurso.nombreRecurso}
+              {recurso.cantidadAsignada ? ` (${recurso.cantidadAsignada})` : ""}
+            </Typography>
           ))
         ) : (
           <Typography color="text.secondary">Sin recursos asignados</Typography>
