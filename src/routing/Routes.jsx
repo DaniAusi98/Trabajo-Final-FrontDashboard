@@ -6,7 +6,7 @@ import MainCalendarPage from "../pages/MainCalendarPage";
 import GroupVisitsPage from "../pages/GroupVisitsPage";
 import EventsActivitiesPage from "../pages/EventsActivitiesPage";
 import EducationPage from "../pages/EducationPage";
-import EventProposalsPage from "../pages/EventProposalsPage";
+import EventPage from "../pages/EventPage";
 import ReportsPage from "../pages/ReportsPage";
 import GroupVisitsReportPage from "../pages/GroupVisitsReportPage";
 import { LoginPage } from "../pages/LoginPage";
@@ -26,7 +26,7 @@ export const RoutesApp = () => {
 
           <Route path="/education" element={<EducationPage />} />
 
-          <Route path="/eventProposals" element={<EventProposalsPage />} />
+          <Route path="/eventForm" element={<EventPage />} />
 
           <Route path="/reports" element={<ReportsPage />} />
 

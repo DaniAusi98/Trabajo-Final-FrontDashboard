@@ -7,7 +7,7 @@ export default function SelfGuidedVisitsDataGrid({ data }) {
 
   const rows = [
     {
-      id: data.id,
+      id: 1,
       reservasTotales: data.reservasTotales,
       visitanteTotales: data.visitanteTotales,
       visitasConfirmadas: data.visitasConfirmadas,
