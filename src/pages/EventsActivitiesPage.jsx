@@ -1,3 +1,5 @@
+import EventsGridWrapper from "../components/events/EventsGridWrapper";
+
 export default function EventsActivitiesPage() {
-  return <h1>Events & Activities</h1>;
+  return <EventsGridWrapper />;
 }

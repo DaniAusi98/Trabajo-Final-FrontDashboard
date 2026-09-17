@@ -21,20 +21,34 @@ import {
 import { API_URL } from "../../services/api";
 import { authService } from "../../lib/auth";
 
+import EventDateConfigurationResponsive from "./EventDateConfigurationResponsive";
+import CalendarToolbar from "../mainCalendar/CalendarToolbar";
+
 const EventAvailabilityCalendar = forwardRef(
-  ({ salasIds = [], selectedStart, onTimeSelect }, ref) => {
+  ({ salasIds = [], onEventConfigurationChange }, ref) => {
     const [events, setEvents] = useState([]);
     const [slotsOriginales, setSlotsOriginales] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [configurationOpen, setConfigurationOpen] = useState(false);
+    const [initialDates, setInitialDates] = useState(null);
+    const [configurationPosition, setConfigurationPosition] = useState(null);
+    const [slotsNoDisponibles, setSlotsNoDisponibles] = useState([]);
+
+    const [view, setView] = useState("dayGridMonth");
+    const [title, setTitle] = useState("");
+
     const calendarRef = useRef(null);
+    const calendarContainerRef = useRef(null);
 
     // =========================================================
     // FETCH DISPONIBILIDAD
     // =========================================================
+
     const fetchAvailableTimes = async (startStr, endStr) => {
       if (!salasIds || salasIds.length === 0) {
         setEvents([]);
         setSlotsOriginales([]);
+        setSlotsNoDisponibles([]);
         return;
       }
 
@@ -45,19 +59,32 @@ const EventAvailabilityCalendar = forwardRef(
         const fechaHasta = dayjs(endStr).format("YYYY-MM-DD");
 
         const params = new URLSearchParams();
+
         params.append("desde", fechaDesde);
         params.append("hasta", fechaHasta);
-        salasIds.forEach((salaId) => params.append("salasIds", salaId));
+
+        salasIds.forEach((salaId) => {
+          params.append("salasIds", salaId);
+        });
 
         const response = await authService.authenticatedFetch(
           `${API_URL}/api/v1/eventos/disponibilidad?${params.toString()}`,
-          { method: "GET" },
+          {
+            method: "GET",
+          },
         );
 
-        if (!response.ok) throw new Error("Error al obtener disponibilidad");
+        if (!response.ok) {
+          throw new Error("Error al obtener disponibilidad");
+        }
 
         const result = await response.json();
+
         const slots = result?.data?.horariosDisponibles ?? [];
+
+        setSlotsNoDisponibles(
+          slots.filter((slot) => slot.disponible === false),
+        );
 
         setSlotsOriginales(slots);
 
@@ -76,8 +103,10 @@ const EventAvailabilityCalendar = forwardRef(
         setEvents(bloqueosMapeados);
       } catch (error) {
         console.error("Error fetching disponibilidad:", error);
+
         setEvents([]);
         setSlotsOriginales([]);
+        setSlotsNoDisponibles([]);
       } finally {
         setLoading(false);
       }
@@ -86,12 +115,14 @@ const EventAvailabilityCalendar = forwardRef(
     // =========================================================
     // REFRESH DESDE EL PADRE
     // =========================================================
+
     useImperativeHandle(
       ref,
       () => ({
         refreshAvailability: () => {
           if (calendarRef.current) {
             const api = calendarRef.current.getApi();
+
             fetchAvailableTimes(api.view.activeStart, api.view.activeEnd);
           }
         },
@@ -99,21 +130,124 @@ const EventAvailabilityCalendar = forwardRef(
       [salasIds],
     );
 
+    // =========================================================
+    // RECARGAR DISPONIBILIDAD CUANDO CAMBIAN LAS SALAS
+    // =========================================================
+
     useEffect(() => {
       if (calendarRef.current) {
         const api = calendarRef.current.getApi();
+
         fetchAvailableTimes(api.view.activeStart, api.view.activeEnd);
       }
     }, [salasIds.join(",")]);
 
     // =========================================================
-    // MANEJO DE SELECCIÓN DESDE CUALQUIER VISTA
+    // ABRIR CONFIGURACIÓN DEL EVENTO
     // =========================================================
+
+    const abrirConfiguracionEvento = (selectInfo) => {
+      const api = calendarRef.current.getApi();
+
+      let initialConfiguration;
+
+      // ---------------------------------------------------------
+      // VISTA MES
+      // Seleccionamos una fecha y damos un horario inicial
+      // ---------------------------------------------------------
+
+      if (api.view.type === "dayGridMonth") {
+        const ahora = dayjs();
+
+        let horaInicio;
+
+        if (ahora.minute() === 0 || ahora.minute() === 30) {
+          horaInicio = ahora;
+        } else if (ahora.minute() < 30) {
+          horaInicio = ahora.minute(30);
+        } else {
+          horaInicio = ahora.add(1, "hour").minute(0);
+        }
+
+        const horaFin = horaInicio.add(1, "hour");
+
+        initialConfiguration = {
+          fechaInicio: dayjs(selectInfo.startStr).format("YYYY-MM-DD"),
+          horaInicio: horaInicio.format("HH:mm"),
+          horaFin: horaFin.format("HH:mm"),
+        };
+      }
+
+      // ---------------------------------------------------------
+      // VISTA SEMANA / DÍA
+      // Seleccionamos fecha + horario
+      // ---------------------------------------------------------
+      else {
+        initialConfiguration = {
+          fechaInicio: dayjs(selectInfo.startStr).format("YYYY-MM-DD"),
+          horaInicio: dayjs(selectInfo.startStr).format("HH:mm"),
+          horaFin: dayjs(selectInfo.endStr).format("HH:mm"),
+        };
+      }
+
+      setInitialDates(initialConfiguration);
+
+      // ---------------------------------------------------------
+      // CENTRO DEL CONTENEDOR DEL CALENDARIO
+      // ---------------------------------------------------------
+
+      const container = calendarContainerRef.current;
+
+      if (container) {
+        const rect = container.getBoundingClientRect();
+
+        setConfigurationPosition({
+          top: rect.top + rect.height / 2,
+          left: rect.left + rect.width / 2,
+        });
+      }
+
+      setConfigurationOpen(true);
+    };
+
+    // =========================================================
+    // CONFIGURACIÓN FINAL DEL EVENTO
+    // =========================================================
+
+    const handleConfigurationChange = (configuracion) => {
+      onEventConfigurationChange?.(configuracion);
+
+      setConfigurationOpen(false);
+      setInitialDates(null);
+      setConfigurationPosition(null);
+    };
+
+    // =========================================================
+    // CERRAR CONFIGURACIÓN
+    // =========================================================
+
+    const handleCloseConfiguration = () => {
+      setConfigurationOpen(false);
+      setInitialDates(null);
+      setConfigurationPosition(null);
+
+      calendarRef.current?.getApi()?.unselect();
+    };
+
+    // =========================================================
+    // MANEJO DE SELECCIÓN
+    // =========================================================
+
     const handleSelectSlot = (selectInfo) => {
       const api = calendarRef.current.getApi();
 
+      // ---------------------------------------------------------
+      // VISTA MES
+      // ---------------------------------------------------------
+
       if (api.view.type === "dayGridMonth") {
         const fechaCeldaStr = dayjs(selectInfo.startStr).format("YYYY-MM-DD");
+
         const slotsDelDia = slotsOriginales.filter(
           (slot) => dayjs(slot.inicio).format("YYYY-MM-DD") === fechaCeldaStr,
         );
@@ -126,9 +260,13 @@ const EventAvailabilityCalendar = forwardRef(
           return;
         }
 
-        onTimeSelect?.(selectInfo.startStr);
+        abrirConfiguracionEvento(selectInfo);
         return;
       }
+
+      // ---------------------------------------------------------
+      // VISTA SEMANA / DÍA
+      // ---------------------------------------------------------
 
       const seSolapaConBloqueo = events.some(
         (b) => selectInfo.startStr < b.end && selectInfo.endStr > b.start,
@@ -139,14 +277,14 @@ const EventAvailabilityCalendar = forwardRef(
         return;
       }
 
-      onTimeSelect?.(selectInfo.startStr);
+      abrirConfiguracionEvento(selectInfo);
     };
 
     // =========================================================
-    // LÓGICA DE CONTROL VISUAL PARA LA VISTA MENSUAL (SIMPLIFICADA)
+    // CONTROL VISUAL MES
     // =========================================================
+
     const handleRenderCeldaMes = (info) => {
-      // Eliminamos el getApi(). Al estar en esta función, ya sabemos de forma segura que es el Mes.
       const fechaCeldaStr = dayjs(info.date).format("YYYY-MM-DD");
 
       const slotsDelDia = slotsOriginales.filter(
@@ -163,8 +301,12 @@ const EventAvailabilityCalendar = forwardRef(
       }
     };
 
+    // =========================================================
+    // RENDER
+    // =========================================================
+
     return (
-      <Box sx={{ position: "relative" }}>
+      <Box ref={calendarContainerRef} sx={{ position: "relative" }}>
         {loading && (
           <Box
             sx={{
@@ -174,7 +316,7 @@ const EventAvailabilityCalendar = forwardRef(
               zIndex: 10,
               display: "flex",
               alignItems: "center",
-              justifyBox: "center",
+              justifyContent: "center",
             }}
           >
             <CircularProgress />
@@ -182,17 +324,27 @@ const EventAvailabilityCalendar = forwardRef(
         )}
 
         <Card>
-          <CardContent sx={{ "& .fc": { fontFamily: "Roboto, sans-serif" } }}>
+          <CardContent
+            sx={{
+              "& .fc": {
+                fontFamily: "Roboto, sans-serif",
+              },
+            }}
+          >
+            <CalendarToolbar
+              view={view}
+              setView={setView}
+              title={title}
+              calendarRef={calendarRef}
+            />
+
             <FullCalendar
               ref={calendarRef}
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
+              headerToolbar={false}
               locale="es"
+              timeZone="local"
               allDaySlot={false}
               slotMinTime="08:00:00"
               slotMaxTime="21:00:00"
@@ -203,6 +355,16 @@ const EventAvailabilityCalendar = forwardRef(
               events={events}
               dayCellDidMount={handleRenderCeldaMes}
               datesSet={(dateInfo) => {
+                const raw = dateInfo.view.title;
+
+                const nextTitle = raw.charAt(0).toUpperCase() + raw.slice(1);
+
+                setView(dateInfo.view.type);
+
+                setTitle((currentTitle) =>
+                  currentTitle === nextTitle ? currentTitle : nextTitle,
+                );
+
                 fetchAvailableTimes(dateInfo.startStr, dateInfo.endStr);
               }}
               eventContent={(arg) => (
@@ -219,6 +381,20 @@ const EventAvailabilityCalendar = forwardRef(
             />
           </CardContent>
         </Card>
+
+        {/* =====================================================
+            CONFIGURACIÓN RESPONSIVE
+        ===================================================== */}
+
+        <EventDateConfigurationResponsive
+          open={configurationOpen}
+          position={configurationPosition}
+          onClose={handleCloseConfiguration}
+          initialDates={initialDates}
+          onEventConfigurationChange={handleConfigurationChange}
+          slotsNoDisponibles={slotsNoDisponibles}
+          salasIds={salasIds}
+        />
       </Box>
     );
   },

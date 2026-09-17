@@ -1,5 +1,5 @@
-import GroupVisitsCalendar from "../components/groupVisits/GroupVisitsCalendar";
+import GroupVisits from "../components/groupVisits/GroupVisits";
 
 export default function GroupVisitsPage() {
-  return <GroupVisitsCalendar />;
+  return <GroupVisits />;
 }

@@ -1,27 +1,33 @@
 import React from "react";
-import { Box, IconButton, Paper, Popper, Typography } from "@mui/material";
+import { Box, Divider, IconButton, Popover, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 
-const EventConfigurationPopper = ({ open, anchorEl, onClose, children }) => {
+const EventConfigurationPopper = ({ open, position, onClose, children }) => {
   return (
-    <Popper
+    <Popover
       open={open}
-      anchorEl={anchorEl}
-      placement="bottom-start"
-      sx={{
-        zIndex: 1300,
+      onClose={onClose}
+      anchorReference="anchorPosition"
+      anchorPosition={position ?? undefined}
+      anchorOrigin={{
+        vertical: "center",
+        horizontal: "center",
+      }}
+      transformOrigin={{
+        vertical: "center",
+        horizontal: "center",
       }}
     >
-      <Paper
-        elevation={8}
+      <Box
         sx={{
-          width: 500,
+          width: 700,
           maxHeight: "80vh",
           overflow: "auto",
           borderRadius: 2,
         }}
       >
         {/* HEADER */}
+
         <Box
           sx={{
             display: "flex",
@@ -38,10 +44,13 @@ const EventConfigurationPopper = ({ open, anchorEl, onClose, children }) => {
           </IconButton>
         </Box>
 
+        <Divider />
+
         {/* CONTENIDO */}
+
         <Box sx={{ px: 2, pb: 2 }}>{children}</Box>
-      </Paper>
-    </Popper>
+      </Box>
+    </Popover>
   );
 };
 

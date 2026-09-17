@@ -48,7 +48,6 @@ export default function ReportPeriodFilter({
       }}
     >
       <DatePicker
-        label="Desde"
         value={fechaDesde}
         onChange={(newValue) => setFechaDesde(newValue)}
         maxDate={fechaHasta}
@@ -57,7 +56,11 @@ export default function ReportPeriodFilter({
           textField: {
             size: "small",
             sx: {
-              width: 180,
+              width: 160,
+              "& .MuiInputBase-input": {
+                fontSize: "0.8rem",
+                py: 0.7,
+              },
             },
           },
         }}
@@ -66,7 +69,6 @@ export default function ReportPeriodFilter({
       <Typography>-</Typography>
 
       <DatePicker
-        label="Hasta"
         value={fechaHasta}
         onChange={(newValue) => setFechaHasta(newValue)}
         minDate={fechaDesde}
@@ -75,13 +77,25 @@ export default function ReportPeriodFilter({
           textField: {
             size: "small",
             sx: {
-              width: 180,
+              width: 160,
+              "& .MuiInputBase-input": {
+                fontSize: "0.8rem",
+                py: 0.7,
+              },
             },
           },
         }}
       />
 
-      <Button variant="contained" size="small" onClick={aplicarPeriodo}>
+      <Button
+        variant="contained"
+        size="small"
+        onClick={aplicarPeriodo}
+        sx={{
+          height: 34,
+          fontSize: "0.8rem",
+        }}
+      >
         Aplicar
       </Button>
     </Box>

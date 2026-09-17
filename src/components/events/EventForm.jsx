@@ -1,12 +1,14 @@
 import * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-
+import dayjs from "dayjs";
 import { useAuth } from "../../auth/AuthContext";
 import { authService } from "../../lib/auth";
 import useNotifications from "../hooks/notification/useNotifications";
 import { API_URL } from "../../services/api";
+import ImageUpload from "../ImageUpload";
+import EventResourceSelector from "../EventResourceSelector";
 
 import {
   Box,
@@ -74,6 +76,17 @@ const schema = z.object({
   SalasIds: z.array(z.string()).min(1, "Seleccione al menos una sala"),
 
   RequiereDifusion: z.boolean(),
+  SolicitarAsistenciaDifusion: z.boolean(),
+
+  RRule: z.string().nullable().default(null),
+  Recursos: z
+    .array(
+      z.object({
+        RecursoId: z.string(),
+        CantidadAsignada: z.coerce.number().int().positive(),
+      }),
+    )
+    .default([]),
 });
 
 // =========================
@@ -114,15 +127,13 @@ const tiposPublico = [
 
 export default function FormularioEventos() {
   const navigate = useNavigate();
-
   const notifications = useNotifications();
-
   const auth = useAuth();
-
   const calendarRef = useRef(null);
-
   const [salas, setSalas] = React.useState([]);
+  const [imagenes, setImagenes] = React.useState([]);
   const [loadingSalas, setLoadingSalas] = React.useState(true);
+  const [recursosDisponibles, setRecursosDisponibles] = useState([]);
 
   const {
     register,
@@ -160,6 +171,9 @@ export default function FormularioEventos() {
       SalasIds: [],
 
       RequiereDifusion: false,
+      RRule: null,
+      SolicitarAsistenciaDifusion: false,
+      Recursos: [],
     },
   });
 
@@ -223,43 +237,96 @@ export default function FormularioEventos() {
     // la disponibilidad anterior deja de ser válida.
     setValue("Inicio", "");
     setValue("Fin", "");
+    setValue("RRule", null);
+    setValue("Recursos", []);
   };
 
   // =========================
   // SELECCIONAR HORARIO
   // =========================
-  /// este capas no lo usemos mas con lo nuevo que estamos hablando
-  const handleTimeSelect = (inicio) => {
-    if (!inicio) {
-      setValue("Inicio", "");
-      setValue("Fin", "");
-      return;
-    }
+  // este es el nuevo que capas usemos para que le llegen los datos finales
+  const handleEventConfigurationChange = (configuracion) => {
+    const inicio =
+      configuracion.fechaInicio && configuracion.horaInicio
+        ? `${configuracion.fechaInicio}T${configuracion.horaInicio}`
+        : "";
+
+    const fin =
+      configuracion.fechaFin && configuracion.horaFin
+        ? `${configuracion.fechaFin}T${configuracion.horaFin}`
+        : "";
 
     setValue("Inicio", inicio, {
       shouldValidate: true,
       shouldDirty: true,
     });
 
-    // El fin del evento todavía no se configura.
-    // Más adelante lo vamos a manejar desde
-    // el modal de configuración.
-    setValue("Fin", "", {
-      shouldValidate: false,
+    setValue("Fin", fin, {
+      shouldValidate: true,
       shouldDirty: true,
     });
-  };
-  // este es el nuevo que capas usemos para que le llegen los datos finales
-  const handleEventConfigurationChange = (configuracion) => {
-    console.log("Configuración del evento:", configuracion);
 
-    // Acá después podremos guardar:
-    // fechaInicio
-    // horaInicio
-    // fechaFin
-    // horaFin
-    // recurrencia
+    setValue("RRule", configuracion.recurrencia || null, {
+      shouldValidate: true,
+      shouldDirty: true,
+    });
+
+    // La disponibilidad de recursos depende
+    // de la nueva configuración temporal.
+    setValue("Recursos", [], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   };
+  const inicio = watch("Inicio");
+  const fin = watch("Fin");
+  const rrule = watch("RRule");
+
+  useEffect(() => {
+    const obtenerDisponibilidadRecursos = async () => {
+      if (!inicio || !fin) {
+        setRecursosDisponibles([]);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          inicio,
+          fin,
+        });
+
+        if (rrule) {
+          params.append("rrule", rrule);
+        }
+
+        const response = await authService.authenticatedFetch(
+          `${API_URL}/api/v1/Recurso/disponibilidad?${params.toString()}`,
+          {
+            method: "GET",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Error al obtener la disponibilidad de recursos");
+        }
+
+        const result = await response.json();
+
+        // CAMBIA ESTA LÍNEA:
+        setRecursosDisponibles(result?.data ?? []); // <--- Extrae directamente el array que está en "data"
+      } catch (error) {
+        console.error("Error obteniendo disponibilidad de recursos:", error);
+
+        setRecursosDisponibles([]);
+
+        notifications.error(
+          "No se pudo obtener la disponibilidad de recursos.",
+        );
+      }
+    };
+
+    obtenerDisponibilidadRecursos();
+  }, [inicio, fin, rrule]);
 
   // =========================
   // SUBMIT
@@ -302,15 +369,33 @@ export default function FormularioEventos() {
     });
 
     formData.append("RequiereDifusion", String(data.RequiereDifusion));
+    if (data.RRule) {
+      formData.append("RRule", data.RRule);
+    }
+    imagenes.forEach((imagen) => {
+      formData.append("imagenes", imagen);
+    });
+    formData.append(
+      "SolicitarAsistenciaDifusion",
+      String(data.SolicitarAsistenciaDifusion ?? false),
+    );
+    data.Recursos.forEach((recurso, index) => {
+      formData.append(`Recursos[${index}].RecursoId`, recurso.RecursoId);
+
+      formData.append(
+        `Recursos[${index}].CantidadAsignada`,
+        String(recurso.CantidadAsignada),
+      );
+    });
 
     try {
-      const response = await authService.authenticatedFetch(
-        `${API_URL}/api/v1/eventos`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      // CAMBIAMOS ESTA LÍNEA por un fetch nativo estándar
+      const response = await fetch(`${API_URL}/api/v1/eventos`, {
+        method: "POST",
+        body: formData, // Mandamos el formData directo
+        // NOTA: Dejamos las headers completamente vacías o no las ponemos.
+        // El navegador inyectará el 'multipart/form-data' correcto por sí solo.
+      });
 
       if (!response.ok) {
         throw new Error("Error al crear el evento");
@@ -612,37 +697,33 @@ export default function FormularioEventos() {
             INICIO
         ========================= */}
 
-        <TextField
-          label="Inicio"
-          fullWidth
-          margin="normal"
-          value={watch("Inicio")}
-          slotProps={{
-            input: {
-              readOnly: true,
-            },
+        <Box
+          sx={{
+            mt: 2,
+            p: 2,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
           }}
-          error={!!errors.Inicio}
-          helperText={
-            errors.Inicio?.message ||
-            "Seleccione un horario desde el calendario"
-          }
-        />
+        >
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>
+            <strong>Fecha seleccionada</strong>
+          </Typography>
 
-        {/* =========================
-            FIN
-        ========================= */}
+          <Typography variant="body1">
+            <strong>Inicio:</strong>{" "}
+            {watch("Inicio")
+              ? dayjs(watch("Inicio")).format("DD/MM/YYYY HH:mm")
+              : "Sin seleccionar"}
+          </Typography>
 
-        <TextField
-          label="Fin"
-          type="datetime-local"
-          fullWidth
-          margin="normal"
-          {...register("Fin")}
-          error={!!errors.Fin}
-          helperText={errors.Fin?.message}
-        />
-
+          <Typography variant="body1" sx={{ mt: 1 }}>
+            <strong>Fin:</strong>{" "}
+            {watch("Fin")
+              ? dayjs(watch("Fin")).format("DD/MM/YYYY HH:mm")
+              : "Sin seleccionar"}
+          </Typography>
+        </Box>
         {/* =========================
             DIFUSIÓN
         ========================= */}
@@ -670,6 +751,31 @@ export default function FormularioEventos() {
                 />
               </RadioGroup>
             </FormControl>
+          )}
+        />
+        <ImageUpload imagenes={imagenes} onChange={setImagenes} />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={watch("SolicitarAsistenciaDifusion")}
+              onChange={(e) =>
+                setValue("SolicitarAsistenciaDifusion", e.target.checked, {
+                  shouldDirty: true,
+                })
+              }
+            />
+          }
+          label="Solicitar asistencia para la creación del flyer o imagen promocional."
+        />
+        <Controller
+          name="Recursos"
+          control={control}
+          render={({ field }) => (
+            <EventResourceSelector
+              recursos={recursosDisponibles}
+              value={field.value}
+              onChange={field.onChange}
+            />
           )}
         />
 
